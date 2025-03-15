@@ -1,5 +1,7 @@
 # RAG Chatbot: Retrieval-Augmented Generation with Ollama and Pinecone
 
+#Developed with the help and insight from https://github.com/Crypto47
+
 ## 🚀 Project Overview
 
 This RAG (Retrieval-Augmented Generation) Chatbot is a sophisticated AI-powered document analysis and question-answering system that combines document embedding, vector storage, and language model generation. It leverages Ollama for embeddings and language models, Pinecone for vector storage, and LangChain for document processing.
