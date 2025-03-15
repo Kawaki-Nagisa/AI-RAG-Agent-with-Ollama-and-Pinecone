@@ -1,22 +1,22 @@
+from langchain.memory.buffer import ConversationBufferMemory
 from langchain_ollama import ChatOllama, OllamaEmbeddings
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_community.document_loaders import PyPDFLoader
+from langchain_community.document_loaders import CSVLoader
 from langchain_pinecone import PineconeVectorStore
-from langchain.memory import buffer
-from langchain_core.messages import SystemMessage, HumanMessage
 from pinecone import Pinecone, ServerlessSpec
 from dotenv import load_dotenv
 import os
 import time
 import logging
+import hashlib
 
 # Constants
-INDEX_NAME = "test"
+INDEX_NAME = "test-w"
 CHUNK_SIZE = 500
 CHUNK_OVERLAP = 250
 EMBEDDING_DIMENSION = 768
 EMBEDDING_MODEL = "nomic-embed-text"
-LLM_MODEL = "llama3.1:latest"
+LLM_MODEL = "deepseek-r1:1.5b"
 TEMPERATURE = 0.4
 
 # Configure logging
@@ -52,14 +52,14 @@ def setup_pinecone_index(pc, index_name):
         )
         print(f"Index '{index_name}' created successfully.")
 
-# Load documents from PDF
+# Load documents
 def load_documents(file_path):
-    print(f"Loading PDF file: {file_path}...")
-    loader = PyPDFLoader(file_path)
+    print(f"Loading Provided file: {file_path}...")
+    loader = CSVLoader(file_path)
     start_time = time.time()
-    pages = loader.load()
-    print(f"Loaded {len(pages)} pages in {time.time() - start_time:.2f} seconds.")
-    return pages
+    documents = loader.load()
+    print(f"Loaded {len(documents)} records in {time.time() - start_time:.2f} seconds.")
+    return documents
 
 # Split documents into chunks
 def split_documents(pages):
@@ -106,8 +106,9 @@ def generate_rag_response(vector_store, embeddings, query, memory):
     )
     history = "\n".join([msg.content for msg in memory.chat_memory.messages])
     prompt = (
-        f"You are an intelligent, helpful AI assistant using retrieval-augmented generation (RAG). "
+        f"You are an intelligent, helpful AI chat assistant using retrieval-augmented generation (RAG). "
         f"Carefully analyze the retrieved context and conversation history to provide an accurate response.\n\n"
+        f"Skip Printing the Thinking Logic and keep your answers short simple and to the point with a focus on user understanding.\n"
         f"Retrieved Context:\n{rag_response}\n\n"
         f"Conversation History:\n{history}\n\n"
         f"User Query: {query}\n\n"
@@ -118,6 +119,21 @@ def generate_rag_response(vector_store, embeddings, query, memory):
     memory.chat_memory.add_user_message(query)
     memory.chat_memory.add_ai_message(response.content)
     return response
+
+def check_index_empty(pc, index_name):
+    """Check if the Pinecone index is empty"""
+    try:
+        index = pc.Index(index_name)
+        stats = index.describe_index_stats()
+        return stats.total_vector_count == 0
+    except Exception as e:
+        logging.error(f"Error checking index: {e}")
+        return True
+
+def initialize_embeddings():
+    """Initialize embeddings model once"""
+    print("Initializing embeddings model...")
+    return OllamaEmbeddings(model=EMBEDDING_MODEL)
 
 # Main function
 def main():
@@ -130,23 +146,29 @@ def main():
     # Setup Pinecone index
     setup_pinecone_index(pc, INDEX_NAME)
 
-    # Load and process documents
-    # file_path = "steganogan.pdf"
-    # pages = load_documents(file_path)
-    # chunks = split_documents(pages)
-    
-    # Create embeddings
-    # vectors, embeddings = create_embeddings(chunks, EMBEDDING_MODEL)
+    # Initialize embeddings model (only once)
+    embeddings = initialize_embeddings()
 
-    # Upload to vector store
-    # vector_store = upload_to_vector_store(pc, INDEX_NAME, embeddings, chunks)
+    # Check if documents already exist in the index
+    if check_index_empty(pc, INDEX_NAME):
+        print("Index is empty. Processing and uploading documents...")
+        # Load and process documents
+        file_path = "restaurants.csv"
+        documents = load_documents(file_path)
+        chunks = split_documents(documents)
+        
+        # Create embeddings
+        vectors = embeddings.embed_documents([chunk.page_content for chunk in chunks])
+
+        # Upload to vector store
+        vector_store = upload_to_vector_store(pc, INDEX_NAME, embeddings, chunks)
+    else:
+        print("Documents already exist in the index. Skipping processing and upload.")
+        vector_store = PineconeVectorStore(index=pc.Index(INDEX_NAME), embedding=embeddings)
 
     # Set up memory and handle user query
-    memory = buffer.ConversationBufferMemory(return_messages=True)
-    query = "Please, Can you explain to me how steganogan beats traditional steganography methods?"
-    embeddings = OllamaEmbeddings(model="nomic-embed-text")
-    myindex = pc.Index(INDEX_NAME)
-    vector_store = PineconeVectorStore(index=myindex, embedding=embeddings)
+    memory = ConversationBufferMemory(return_messages=True)
+    query = "Give me a list of possible rates for Biryani with respect to delivcery time"
     response = generate_rag_response(vector_store, embeddings, query, memory)
 
     # Display response
