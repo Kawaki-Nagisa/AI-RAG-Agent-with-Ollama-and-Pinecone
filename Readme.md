@@ -14,7 +14,7 @@ This RAG (Retrieval-Augmented Generation) Chatbot is a sophisticated AI-powered 
 
 ## 🛠 Technologies Used
 
-- **Language Model**: Ollama (Llama3.1)
+- **Language Model**: Ollama (Deepseek-r1:1.5b)
 - **Embeddings**: Nomic Embed Text
 - **Vector Database**: Pinecone
 - **Document Processing**: LangChain
@@ -31,8 +31,8 @@ This RAG (Retrieval-Augmented Generation) Chatbot is a sophisticated AI-powered 
 
 1. Clone the repository:
 ```bash
-git clone https://github.com/yourusername/rag-chatbot.git
-cd rag-chatbot
+git clone https://github.com/Kawaki-Nagisa/AI-RAG-Agent-with-Ollama-and-Pinecone.git
+cd PineCone-RAG-Assistant
 ```
 
 2. Create a virtual environment:
